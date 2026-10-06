@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#1671c9">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" href="icon-192.png">
+<title>数字タッチ</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: -apple-system, BlinkMacSystemFont, "Noto Sans JP", "Yu Gothic", sans-serif;
+    background: linear-gradient(145deg, #eaf6ff 0%, #fff8df 100%);
+    color: #26364a;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    padding: 18px 10px 30px;
+  }
+  .app {
+    width: min(94vw, 520px);
+    text-align: center;
+  }
+  h1 {
+    margin: 4px 0 8px;
+    font-size: clamp(30px, 8vw, 42px);
+    color: #1671c9;
+    letter-spacing: .06em;
+    text-shadow: 1px 2px 0 rgba(255,255,255,.9);
+  }
+  .instruction {
+    margin: 0 0 12px;
+    font-size: clamp(16px, 4.5vw, 20px);
+    font-weight: 700;
+  }
+  .status {
+    min-height: 34px;
+    margin-bottom: 10px;
+    font-size: clamp(18px, 5vw, 24px);
+    font-weight: 800;
+    color: #155a91;
+  }
+  .timer {
+    background: rgba(255,255,255,.9);
+    border-radius: 16px;
+    padding: 7px 14px;
+    margin: 0 auto 12px;
+    width: fit-content;
+    min-width: 150px;
+    font-size: clamp(28px, 8vw, 40px);
+    font-weight: 900;
+    color: #0d67b7;
+    box-shadow: 0 4px 12px rgba(40,90,130,.13);
+    font-variant-numeric: tabular-nums;
+  }
+  .controls { margin-bottom: 14px; }
+  button {
+    font-family: inherit;
+    touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #startBtn, #againBtn {
+    border: 0;
+    border-radius: 18px;
+    background: linear-gradient(#ffb52f, #f28b16);
+    color: white;
+    font-size: clamp(20px, 5.5vw, 27px);
+    font-weight: 900;
+    padding: 13px 30px;
+    min-width: 190px;
+    box-shadow: 0 5px 0 #cc7010, 0 8px 16px rgba(180,110,20,.2);
+    cursor: pointer;
+  }
+  #startBtn:active, #againBtn:active {
+    transform: translateY(4px);
+    box-shadow: 0 1px 0 #cc7010, 0 4px 8px rgba(180,110,20,.2);
+  }
+  .board-wrap {
+    background: rgba(255,255,255,.78);
+    border-radius: 22px;
+    padding: 12px;
+    box-shadow: 0 7px 22px rgba(50,90,120,.14);
+  }
+  .board {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: clamp(7px, 2vw, 11px);
+  }
+  .num {
+    aspect-ratio: 1;
+    border: 0;
+    border-radius: 18px;
+    color: white;
+    font-size: clamp(27px, 8vw, 42px);
+    font-weight: 900;
+    text-shadow: 1px 2px 2px rgba(0,0,0,.2);
+    box-shadow: inset 0 -5px 0 rgba(0,0,0,.13), 0 4px 8px rgba(50,80,110,.16);
+    cursor: pointer;
+  }
+  .num:active {
+    transform: scale(.94);
+    box-shadow: inset 0 -2px 0 rgba(0,0,0,.13), 0 2px 4px rgba(50,80,110,.12);
+  }
+  .c1 { background: #ef6b67; }
+  .c2 { background: #f39a3d; }
+  .c3 { background: #58b86b; }
+  .c4 { background: #4b9ee8; }
+  .c5 { background: #9271d1; }
+
+  .num.done {
+    visibility: hidden;
+    pointer-events: none;
+  }
+  .num.wrong {
+    animation: shake .18s linear 2;
+  }
+  @keyframes shake {
+    0%,100% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    75% { transform: translateX(5px); }
+  }
+
+  .result {
+    display: none;
+    margin-top: 16px;
+    background: rgba(255,255,255,.94);
+    border-radius: 22px;
+    padding: 18px 14px 16px;
+    box-shadow: 0 7px 22px rgba(50,90,120,.15);
+  }
+  .result.show { display: block; }
+  .result-title {
+    margin: 0 0 5px;
+    font-size: clamp(24px, 6vw, 32px);
+    color: #16804a;
+    font-weight: 900;
+  }
+  .my-time {
+    font-size: clamp(22px, 6vw, 30px);
+    font-weight: 900;
+    margin: 3px 0 5px;
+    color: #135f9d;
+  }
+  .rank-message {
+    font-size: clamp(18px, 5vw, 23px);
+    font-weight: 900;
+    margin: 5px 0 14px;
+    color: #e27416;
+  }
+  .ranking-title {
+    margin: 10px 0 7px;
+    font-size: 21px;
+    font-weight: 900;
+    color: #344b62;
+  }
+  .ranking {
+    margin: 0 auto 16px;
+    width: min(100%, 390px);
+    border-collapse: separate;
+    border-spacing: 0 4px;
+    font-size: clamp(16px, 4.5vw, 20px);
+    font-variant-numeric: tabular-nums;
+  }
+  .ranking td {
+    background: #f2f7fb;
+    padding: 6px 9px;
+  }
+  .ranking tr:first-child td { background: #fff1c7; }
+  .ranking tr:nth-child(2) td { background: #eef1f4; }
+  .ranking tr:nth-child(3) td { background: #f8e9dd; }
+  .ranking td:first-child {
+    width: 28%;
+    text-align: center;
+    font-weight: 900;
+    border-radius: 9px 0 0 9px;
+  }
+  .ranking td:last-child {
+    text-align: right;
+    font-weight: 900;
+    border-radius: 0 9px 9px 0;
+  }
+  .note {
+    margin-top: 9px;
+    color: #6b7a89;
+    font-size: 13px;
+  }
+  #gameArea { display: none; }
+  #gameArea.active { display: block; }
+</style>
+</head>
+<body>
+<div class="app">
+  <h1>🔢 数字タッチ</h1>
+  <p class="instruction">1から25まで、順番にタッチしてください</p>
+
+  <div class="status" id="status">「スタート」を押してください</div>
+  <div class="timer" id="timer">0.00秒</div>
+
+  <div class="controls">
+    <button id="startBtn">▶ スタート</button>
+  </div>
+
+  <div id="gameArea">
+    <div class="board-wrap">
+      <div class="board" id="board"></div>
+    </div>
+  </div>
+
+  <div class="result" id="result">
+    <div class="result-title">🎉 お疲れさまでした！</div>
+    <div class="my-time" id="myTime"></div>
+    <div class="rank-message" id="rankMessage"></div>
+
+    <div class="ranking-title">🏆 ベスト10</div>
+    <table class="ranking">
+      <tbody id="rankingBody"></tbody>
+    </table>
+
+    <button id="againBtn">もう一度</button>
+    <div class="note">記録はこのスマートフォンの中に保存されます。</div>
+  </div>
+</div>
+
+<script>
+(() => {
+  const BEST_KEY = "numberTouchBest10_v1";
+  const board = document.getElementById("board");
+  const gameArea = document.getElementById("gameArea");
+  const startBtn = document.getElementById("startBtn");
+  const againBtn = document.getElementById("againBtn");
+  const timerEl = document.getElementById("timer");
+  const statusEl = document.getElementById("status");
+  const resultEl = document.getElementById("result");
+  const myTimeEl = document.getElementById("myTime");
+  const rankMessageEl = document.getElementById("rankMessage");
+  const rankingBody = document.getElementById("rankingBody");
+
+  let nextNumber = 1;
+  let startTime = 0;
+  let timerId = null;
+  let playing = false;
+
+  function getBest() {
+    try {
+      const data = JSON.parse(localStorage.getItem(BEST_KEY) || "[]");
+      return Array.isArray(data) ? data.filter(n => Number.isFinite(n)) : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function saveBest(list) {
+    try {
+      localStorage.setItem(BEST_KEY, JSON.stringify(list.slice(0, 10)));
+    } catch (e) {}
+  }
+
+  function formatTime(sec) {
+    return sec.toFixed(2) + "秒";
+  }
+
+  function updateTimer() {
+    if (!playing) return;
+    const elapsed = (performance.now() - startTime) / 1000;
+    timerEl.textContent = formatTime(elapsed);
+    timerId = requestAnimationFrame(updateTimer);
+  }
+
+  function shuffledNumbers() {
+    const arr = Array.from({length: 25}, (_, i) => i + 1);
+    for (let i = arr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+  }
+
+  function buildBoard() {
+    board.innerHTML = "";
+    const nums = shuffledNumbers();
+    nums.forEach((n, index) => {
+      const b = document.createElement("button");
+      b.className = "num c" + ((index % 5) + 1);
+      b.textContent = n;
+      b.dataset.number = n;
+      b.addEventListener("click", () => tapNumber(b, n));
+      board.appendChild(b);
+    });
+  }
+
+  function tapNumber(button, n) {
+    if (!playing) return;
+
+    if (n !== nextNumber) {
+      statusEl.textContent = "次は " + nextNumber + " です";
+      button.classList.remove("wrong");
+      void button.offsetWidth;
+      button.classList.add("wrong");
+      return;
+    }
+
+    button.classList.add("done");
+    nextNumber++;
+
+    if (nextNumber <= 25) {
+      statusEl.textContent = "次は " + nextNumber + " です";
+    } else {
+      finishGame();
+    }
+  }
+
+  function startGame() {
+    cancelAnimationFrame(timerId);
+    nextNumber = 1;
+    playing = true;
+    resultEl.classList.remove("show");
+    gameArea.classList.add("active");
+    startBtn.style.display = "none";
+    statusEl.textContent = "次は 1 です";
+    timerEl.textContent = "0.00秒";
+    buildBoard();
+    startTime = performance.now();
+    timerId = requestAnimationFrame(updateTimer);
+  }
+
+  function finishGame() {
+    playing = false;
+    cancelAnimationFrame(timerId);
+
+    const elapsed = (performance.now() - startTime) / 1000;
+    const time = Number(elapsed.toFixed(2));
+    timerEl.textContent = formatTime(time);
+
+    const oldBest = getBest();
+    const all = [...oldBest, time].sort((a, b) => a - b);
+    const rank = all.indexOf(time) + 1;
+    const best10 = all.slice(0, 10);
+    saveBest(best10);
+
+    myTimeEl.textContent = "今回の記録　" + formatTime(time);
+
+    if (rank <= 10) {
+      rankMessageEl.textContent = "🎊 ベスト10入り！ " + rank + "位";
+    } else {
+      rankMessageEl.textContent = "今回は " + rank + "位でした";
+    }
+
+    rankingBody.innerHTML = "";
+    best10.forEach((score, i) => {
+      const tr = document.createElement("tr");
+      const rankCell = document.createElement("td");
+      const timeCell = document.createElement("td");
+      const medals = ["🥇", "🥈", "🥉"];
+      rankCell.textContent = medals[i] || (i + 1) + "位";
+      timeCell.textContent = formatTime(score);
+      tr.appendChild(rankCell);
+      tr.appendChild(timeCell);
+      rankingBody.appendChild(tr);
+    });
+
+    // ゲーム終了時は盤面を隠し、結果画面だけを表示する
+    gameArea.classList.remove("active");
+    resultEl.classList.add("show");
+    statusEl.textContent = "終了しました";
+  }
+
+  function resetForAgain() {
+    resultEl.classList.remove("show");
+    startBtn.style.display = "";
+    gameArea.classList.remove("active");
+    statusEl.textContent = "「スタート」を押してください";
+    timerEl.textContent = "0.00秒";
+    window.scrollTo({top: 0, behavior: "smooth"});
+  }
+
+  startBtn.addEventListener("click", startGame);
+  againBtn.addEventListener("click", startGame);
+
+  // 初期画面
+  gameArea.classList.remove("active");
+})();
+</script>
+<script>
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("./sw.js").catch(() => {});
+  });
+}
+</script>
+</body>
+</html>
