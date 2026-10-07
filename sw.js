@@ -1,4 +1,4 @@
-const CACHE_NAME = "number-touch-v1";
+const CACHE_NAME = "number-touch-v2";
 const FILES = [
   "./",
   "./index.html",
