@@ -3,9 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<meta name="theme-color" content="#1671c9">
-<link rel="manifest" href="manifest.json">
-<link rel="icon" href="icon-192.png">
+<meta name="theme-color" content="#eef7ff">
 <title>数字タッチ</title>
 <style>
   * { box-sizing: border-box; }
@@ -189,6 +187,35 @@
   }
   #gameArea { display: none; }
   #gameArea.active { display: block; }
+
+  .retry-button {
+    display: block;
+    margin: 16px auto 4px;
+    padding: 11px 28px;
+    border: none;
+    border-radius: 14px;
+    background: #777;
+    color: white;
+    font-size: 21px;
+    font-weight: 900;
+    cursor: pointer;
+    box-shadow: 0 3px 7px rgba(0,0,0,.15);
+  }
+  .retry-button:active { transform: translateY(2px); }
+  .countdown-overlay {
+    position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: rgba(255,255,255,.72); z-index: 1000;
+  }
+  .countdown-number {
+    font-size: clamp(110px, 28vw, 220px); font-weight: 900; color: #1671c9;
+    text-shadow: 0 4px 10px rgba(0,0,0,.12);
+  }
+  .start-message {
+    position: fixed; top: 14px; left: 50%; transform: translateX(-50%); z-index: 1001;
+    background: #ff8a00; color: white; font-size: clamp(24px, 6vw, 42px); font-weight: 900;
+    padding: 8px 24px; border-radius: 18px; box-shadow: 0 4px 10px rgba(0,0,0,.16);
+    pointer-events: none;
+  }
 </style>
 </head>
 <body>
@@ -206,6 +233,7 @@
   <div id="gameArea">
     <div class="board-wrap">
       <div class="board" id="board"></div>
+      <button id="retryBtn" class="retry-button" type="button">やりなおす</button>
     </div>
   </div>
 
@@ -224,6 +252,9 @@
   </div>
 </div>
 
+<div id="countdownOverlay" class="countdown-overlay" style="display:none"><div id="countdownNumber" class="countdown-number"></div></div>
+<div id="startMessage" class="start-message" style="display:none">スタート！</div>
+
 <script>
 (() => {
   const BEST_KEY = "numberTouchBest10_v1";
@@ -231,6 +262,10 @@
   const gameArea = document.getElementById("gameArea");
   const startBtn = document.getElementById("startBtn");
   const againBtn = document.getElementById("againBtn");
+  const retryBtn = document.getElementById("retryBtn");
+  const countdownOverlay = document.getElementById("countdownOverlay");
+  const countdownNumber = document.getElementById("countdownNumber");
+  const startMessage = document.getElementById("startMessage");
   const timerEl = document.getElementById("timer");
   const statusEl = document.getElementById("status");
   const resultEl = document.getElementById("result");
@@ -242,6 +277,8 @@
   let startTime = 0;
   let timerId = null;
   let playing = false;
+  let countdownId = null;
+  let startMessageTimeoutId = null;
 
   function getBest() {
     try {
@@ -314,16 +351,51 @@
 
   function startGame() {
     cancelAnimationFrame(timerId);
+    if (countdownId !== null) {
+      clearInterval(countdownId);
+      countdownId = null;
+    }
+    if (startMessageTimeoutId !== null) {
+      clearTimeout(startMessageTimeoutId);
+      startMessageTimeoutId = null;
+    }
+
     nextNumber = 1;
-    playing = true;
+    playing = false;
     resultEl.classList.remove("show");
     gameArea.classList.add("active");
     startBtn.style.display = "none";
-    statusEl.textContent = "次は 1 です";
+    retryBtn.style.display = "block";
+    statusEl.textContent = "準備してください";
     timerEl.textContent = "0.00秒";
+    startMessage.style.display = "none";
     buildBoard();
-    startTime = performance.now();
-    timerId = requestAnimationFrame(updateTimer);
+
+    board.style.pointerEvents = "none";
+    countdownOverlay.style.display = "flex";
+    let count = 3;
+    countdownNumber.textContent = count;
+
+    countdownId = setInterval(() => {
+      count--;
+      if (count > 0) {
+        countdownNumber.textContent = count;
+      } else {
+        clearInterval(countdownId);
+        countdownId = null;
+        countdownOverlay.style.display = "none";
+        startMessage.style.display = "block";
+        board.style.pointerEvents = "auto";
+        statusEl.textContent = "1から順番にタッチしてください";
+        playing = true;
+        startTime = performance.now();
+        timerId = requestAnimationFrame(updateTimer);
+        startMessageTimeoutId = setTimeout(() => {
+          startMessage.style.display = "none";
+          startMessageTimeoutId = null;
+        }, 1000);
+      }
+    }, 1000);
   }
 
   function finishGame() {
@@ -363,6 +435,7 @@
 
     // ゲーム終了時は盤面を隠し、結果画面だけを表示する
     gameArea.classList.remove("active");
+    retryBtn.style.display = "none";
     resultEl.classList.add("show");
     statusEl.textContent = "終了しました";
   }
@@ -378,17 +451,16 @@
 
   startBtn.addEventListener("click", startGame);
   againBtn.addEventListener("click", startGame);
+  retryBtn.addEventListener("click", () => {
+    cancelAnimationFrame(timerId);
+    playing = false;
+    startGame();
+  });
 
   // 初期画面
   gameArea.classList.remove("active");
+  retryBtn.style.display = "none";
 })();
-</script>
-<script>
-if ("serviceWorker" in navigator) {
-  window.addEventListener("load", () => {
-    navigator.serviceWorker.register("./sw.js").catch(() => {});
-  });
-}
 </script>
 </body>
 </html>
