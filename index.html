@@ -22,12 +22,59 @@
     width: min(94vw, 520px);
     text-align: center;
   }
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    min-height: 52px;
+    margin-bottom: 4px;
+  }
   h1 {
     margin: 4px 0 8px;
     font-size: clamp(30px, 8vw, 42px);
     color: #1671c9;
     letter-spacing: .06em;
     text-shadow: 1px 2px 0 rgba(255,255,255,.9);
+  }
+  .topbar h1 { font-size: clamp(24px, 7vw, 36px); }
+  #settingsBtn {
+    position: absolute;
+    right: 0;
+    top: 4px;
+    border: 0;
+    border-radius: 12px;
+    background: #ffffffd9;
+    color: #28506f;
+    padding: 9px 10px;
+    font-size: 15px;
+    font-weight: 800;
+    box-shadow: 0 2px 7px rgba(40,70,100,.13);
+  }
+  .settings-panel {
+    margin: 0 0 14px;
+    padding: 14px 16px;
+    border-radius: 16px;
+    background: rgba(255,255,255,.96);
+    box-shadow: 0 5px 16px rgba(50,90,120,.15);
+    text-align: left;
+  }
+  .settings-panel[hidden] { display: none; }
+  .settings-heading { margin: 0 0 10px; font-size: 19px; font-weight: 900; }
+  .setting-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 9px 0;
+    font-size: 17px;
+    font-weight: 700;
+    border-top: 1px solid #e7edf2;
+  }
+  .setting-row input { width: 23px; height: 23px; accent-color: #1671c9; flex-shrink: 0; }
+  .settings-close {
+    display: block; margin: 10px 0 0 auto; border: 0; border-radius: 10px;
+    padding: 8px 16px; background: #e8f1f8; color: #244b68; font-size: 16px; font-weight: 800;
   }
   .instruction {
     margin: 0 0 12px;
@@ -220,7 +267,16 @@
 </head>
 <body>
 <div class="app">
-  <h1>🔢 数字タッチ</h1>
+  <div class="topbar">
+    <h1>🔢 数字タッチ</h1>
+    <button id="settingsBtn" type="button" aria-expanded="false" aria-controls="settingsPanel">⚙ 設定</button>
+  </div>
+  <section id="settingsPanel" class="settings-panel" hidden>
+    <p class="settings-heading">遊び方の設定</p>
+    <label class="setting-row" for="vibrationToggle"><span>振動させる</span><input id="vibrationToggle" type="checkbox" checked></label>
+    <label class="setting-row" for="soundToggle"><span>タッチ時に音を鳴らす</span><input id="soundToggle" type="checkbox" checked></label>
+    <button id="settingsClose" class="settings-close" type="button">閉じる</button>
+  </section>
   <p class="instruction">1から25まで、順番にタッチしてください</p>
 
   <div class="status" id="status">「スタート」を押してください</div>
@@ -272,6 +328,89 @@
   const myTimeEl = document.getElementById("myTime");
   const rankMessageEl = document.getElementById("rankMessage");
   const rankingBody = document.getElementById("rankingBody");
+  const settingsBtn = document.getElementById("settingsBtn");
+  const settingsPanel = document.getElementById("settingsPanel");
+  const settingsClose = document.getElementById("settingsClose");
+  const vibrationToggle = document.getElementById("vibrationToggle");
+  const soundToggle = document.getElementById("soundToggle");
+  const SETTINGS_KEY = "numberTouchSettings_v1";
+  let audioContext = null;
+
+  function loadSettings() {
+    try {
+      const saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}");
+      vibrationToggle.checked = saved.vibration !== false;
+      soundToggle.checked = saved.sound !== false;
+    } catch (e) {}
+  }
+
+  function saveSettings() {
+    try {
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify({
+        vibration: vibrationToggle.checked,
+        sound: soundToggle.checked
+      }));
+    } catch (e) {}
+  }
+
+  function playWoodTap() {
+    if (!soundToggle.checked) return;
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      if (!audioContext) audioContext = new AudioCtx();
+      if (audioContext.state === "suspended") audioContext.resume();
+      const now = audioContext.currentTime;
+
+      // 短く低い木の「コトッ」という音を合成
+      const body = audioContext.createOscillator();
+      const bodyGain = audioContext.createGain();
+      body.type = "sine";
+      body.frequency.setValueAtTime(185, now);
+      body.frequency.exponentialRampToValueAtTime(105, now + 0.075);
+      bodyGain.gain.setValueAtTime(0.0001, now);
+      bodyGain.gain.exponentialRampToValueAtTime(0.22, now + 0.006);
+      bodyGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.105);
+      body.connect(bodyGain); bodyGain.connect(audioContext.destination);
+      body.start(now); body.stop(now + 0.11);
+
+      // ごく短い丸みのある打音を加えて、電子音っぽさを抑える
+      const length = Math.floor(audioContext.sampleRate * 0.025);
+      const buffer = audioContext.createBuffer(1, length, audioContext.sampleRate);
+      const data = buffer.getChannelData(0);
+      for (let i = 0; i < length; i++) data[i] = (Math.random() * 2 - 1) * (1 - i / length);
+      const noise = audioContext.createBufferSource();
+      const filter = audioContext.createBiquadFilter();
+      const noiseGain = audioContext.createGain();
+      noise.buffer = buffer;
+      filter.type = "lowpass"; filter.frequency.setValueAtTime(700, now);
+      noiseGain.gain.setValueAtTime(0.0001, now);
+      noiseGain.gain.exponentialRampToValueAtTime(0.055, now + 0.003);
+      noiseGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.028);
+      noise.connect(filter); filter.connect(noiseGain); noiseGain.connect(audioContext.destination);
+      noise.start(now); noise.stop(now + 0.03);
+    } catch (e) {}
+  }
+
+  function correctTapFeedback() {
+    if (vibrationToggle.checked && typeof navigator.vibrate === "function") {
+      try { navigator.vibrate(12); } catch (e) {}
+    }
+    playWoodTap();
+  }
+
+  settingsBtn.addEventListener("click", () => {
+    const willOpen = settingsPanel.hidden;
+    settingsPanel.hidden = !willOpen;
+    settingsBtn.setAttribute("aria-expanded", String(willOpen));
+  });
+  settingsClose.addEventListener("click", () => {
+    settingsPanel.hidden = true;
+    settingsBtn.setAttribute("aria-expanded", "false");
+  });
+  vibrationToggle.addEventListener("change", saveSettings);
+  soundToggle.addEventListener("change", saveSettings);
+  loadSettings();
 
   let nextNumber = 1;
   let startTime = 0;
@@ -339,6 +478,7 @@
       return;
     }
 
+    correctTapFeedback();
     button.classList.add("done");
     nextNumber++;
 
